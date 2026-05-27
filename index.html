@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Neon Shooter</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101216;
+      --panel: rgba(21, 25, 33, 0.88);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #f4f7fb;
+      --muted: #aeb8c8;
+      --cyan: #36d8ff;
+      --lime: #9dff6d;
+      --rose: #ff4f7b;
+      --amber: #ffc857;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background:
+        radial-gradient(circle at 50% 16%, rgba(54, 216, 255, 0.12), transparent 34%),
+        linear-gradient(180deg, #151923 0%, var(--bg) 58%, #090a0d 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .game-shell {
+      width: min(100vw, 1100px);
+      height: min(100vh, 760px);
+      height: min(100dvh, 760px);
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+
+    .hud {
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .stat strong {
+      font-size: clamp(15px, 2vw, 22px);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .arena {
+      position: relative;
+      min-height: 0;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        #11151d;
+      background-size: 40px 40px;
+      box-shadow: inset 0 0 42px rgba(54, 216, 255, 0.08), 0 18px 60px rgba(0, 0, 0, 0.36);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(5, 7, 11, 0.58);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .overlay.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dialog {
+      width: min(440px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(18, 23, 31, 0.94);
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 22px 70px rgba(0, 0, 0, 0.46);
+      backdrop-filter: blur(14px);
+    }
+
+    .dialog h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 7vw, 48px);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .dialog p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      background: var(--cyan);
+      color: #061016;
+      min-height: 44px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 12px 28px rgba(54, 216, 255, 0.24);
+    }
+
+    #startButton {
+      min-width: 132px;
+    }
+
+    .pause-button {
+      position: absolute;
+      top: max(10px, env(safe-area-inset-top));
+      right: max(10px, env(safe-area-inset-right));
+      z-index: 2;
+      width: 42px;
+      min-height: 42px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(21, 25, 33, 0.76);
+      color: var(--text);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .lang-button {
+      position: absolute;
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      z-index: 2;
+      min-width: 54px;
+      min-height: 42px;
+      padding: 0 10px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(21, 25, 33, 0.76);
+      color: var(--text);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .controls {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      flex-wrap: wrap;
+    }
+
+    kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 24px;
+      height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 6px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    @media (max-width: 720px) {
+      .game-shell {
+        width: 100vw;
+        height: 100dvh;
+        padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+        gap: 7px;
+      }
+
+      .hud {
+        min-height: 82px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .stat {
+        min-width: 0;
+        min-height: 38px;
+        padding: 6px 7px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 3px;
+      }
+
+      .stat span {
+        font-size: 10px;
+      }
+
+      .stat strong {
+        max-width: 100%;
+        font-size: 16px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pause-button {
+        width: 48px;
+        min-height: 48px;
+        font-size: 16px;
+      }
+
+      .lang-button {
+        min-width: 54px;
+        min-height: 48px;
+        font-size: 14px;
+      }
+
+      .controls {
+        min-height: 28px;
+        font-size: 11px;
+        gap: 8px;
+      }
+
+      .controls span:first-child {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hud {
+        min-height: 72px;
+      }
+
+      .stat:nth-child(5),
+      .stat:nth-child(6) {
+        display: none;
+      }
+
+      .dialog {
+        padding: 18px;
+      }
+
+      .dialog p {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell" aria-label="Neon Shooter">
+    <section class="hud" aria-label="ステータス">
+      <div class="stat"><span data-i18n="score">Score</span><strong id="score">0</strong></div>
+      <div class="stat"><span data-i18n="life">Life</span><strong id="life">3</strong></div>
+      <div class="stat"><span data-i18n="wave">Wave</span><strong id="wave">1</strong></div>
+      <div class="stat"><span data-i18n="power">Power</span><strong id="power">-</strong></div>
+      <div class="stat"><span data-i18n="combo">Combo</span><strong id="combo">x1</strong></div>
+      <div class="stat"><span data-i18n="best">Best</span><strong id="best">0</strong></div>
+    </section>
+
+    <section class="arena">
+      <button class="lang-button" id="langButton" type="button" title="Language" aria-label="Language">JP</button>
+      <button class="pause-button" id="pauseButton" type="button" title="一時停止" aria-label="一時停止">II</button>
+      <canvas id="game" aria-label="射撃ゲーム画面"></canvas>
+      <div class="overlay is-visible" id="overlay">
+        <div class="dialog">
+          <h1 id="title">Neon Shooter</h1>
+          <p id="message">敵を撃ち落とし、落ちてくる強化アイテムで生き残れ。</p>
+          <button id="startButton" type="button">Start</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="操作方法">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <span data-i18n="move">矢印キーで移動</span></span>
+      <span><kbd>Space</kbd> / <span data-i18n="shoot">クリック / タップで射撃</span></span>
+      <span><kbd>P</kbd><span data-i18n="pauseHelp">で一時停止</span></span>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.querySelector("#game");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.querySelector("#score");
+    const lifeEl = document.querySelector("#life");
+    const waveEl = document.querySelector("#wave");
+    const powerEl = document.querySelector("#power");
+    const comboEl = document.querySelector("#combo");
+    const bestEl = document.querySelector("#best");
+    const overlay = document.querySelector("#overlay");
+    const titleEl = document.querySelector("#title");
+    const messageEl = document.querySelector("#message");
+    const startButton = document.querySelector("#startButton");
+    const langButton = document.querySelector("#langButton");
+    const pauseButton = document.querySelector("#pauseButton");
+
+    const keys = new Set();
+    const bullets = [];
+    const enemies = [];
+    const powerUps = [];
+    const sparks = [];
+    const rings = [];
+    const floatTexts = [];
+    const stars = [];
+    const pointer = { active: false, x: 0, y: 0, offsetY: 0 };
+    const bestKey = "neon-shooter-best";
+    const langKey = "neon-shooter-lang";
+
+    const i18n = {
+      ja: {
+        score: "スコア",
+        life: "ライフ",
+        wave: "ウェーブ",
+        power: "強化",
+        combo: "コンボ",
+        best: "ベスト",
+        move: "矢印キーで移動",
+        shoot: "クリック / タップで射撃",
+        pauseHelp: "で一時停止",
+        pauseLabel: "一時停止",
+        resumeLabel: "再開",
+        title: "Neon Shooter",
+        intro: "敵を撃ち落とし、落ちてくる強化アイテムで生き残れ。",
+        start: "開始",
+        restart: "もう一度",
+        gameOver: "Game Over",
+        gameOverMessage: (score) => `${score}点。もう一回いこう。`,
+        paused: "一時停止",
+        waveText: (wave) => `Wave ${wave}`,
+        rapid: "連射",
+        spread: "拡散",
+        shield: "シールド",
+        heal: "回復",
+        blocked: "防御",
+        comboText: (combo) => `${combo} Combo`,
+        langButton: "EN",
+        arenaLabel: "射撃ゲーム画面",
+        hudLabel: "ステータス",
+        controlsLabel: "操作方法"
+      },
+      en: {
+        score: "Score",
+        life: "Life",
+        wave: "Wave",
+        power: "Power",
+        combo: "Combo",
+        best: "Best",
+        move: "Move with arrows",
+        shoot: "Click / tap to shoot",
+        pauseHelp: " to pause",
+        pauseLabel: "Pause",
+        resumeLabel: "Resume",
+        title: "Neon Shooter",
+        intro: "Shoot down enemies, collect power-ups, and survive.",
+        start: "Start",
+        restart: "Restart",
+        gameOver: "Game Over",
+        gameOverMessage: (score) => `${score} points. Run it back.`,
+        paused: "Paused",
+        waveText: (wave) => `Wave ${wave}`,
+        rapid: "Rapid",
+        spread: "Spread",
+        shield: "Shield",
+        heal: "Heal",
+        blocked: "Blocked",
+        comboText: (combo) => `${combo} Combo`,
+        langButton: "JP",
+        arenaLabel: "Shooter game screen",
+        hudLabel: "Stats",
+        controlsLabel: "Controls"
+      }
+    };
+
+    function loadLanguage() {
+      try {
+        const saved = localStorage.getItem(langKey);
+        if (saved === "ja" || saved === "en") return saved;
+      } catch {}
+      return navigator.language && navigator.language.startsWith("ja") ? "ja" : "en";
+    }
+
+    function saveLanguage(value) {
+      try { localStorage.setItem(langKey, value); } catch {}
+    }
+
+    let language = loadLanguage();
+
+    function t(key, value) {
+      const entry = i18n[language][key];
+      return typeof entry === "function" ? entry(value) : entry;
+    }
+
+    function loadBestScore() {
+      try { return Number(localStorage.getItem(bestKey) || 0); } catch { return 0; }
+    }
+
+    function saveBestScore(score) {
+      try { localStorage.setItem(bestKey, String(score)); } catch {}
+    }
+
+    const game = {
+      running: false,
+      paused: false,
+      lastTime: 0,
+      score: 0,
+      life: 3,
+      wave: 1,
+      spawnTimer: 0,
+      shootTimer: 0,
+      power: "",
+      powerTimer: 0,
+      shield: false,
+      combo: 0,
+      comboTimer: 0,
+      comboScale: 0,
+      magnetRange: 96,
+      invincible: 0,
+      hitFlash: 0,
+      shake: 0,
+      waveFlash: 0,
+      best: loadBestScore()
+    };
+
+    const player = { x: 480, y: 520, r: 17, speed: 340 };
+    bestEl.textContent = game.best;
+
+    function width() { return canvas.getBoundingClientRect().width; }
+    function height() { return canvas.getBoundingClientRect().height; }
+
+    function fitCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const scale = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      canvas.width = Math.floor(rect.width * scale);
+      canvas.height = Math.floor(rect.height * scale);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      player.x = Math.min(player.x, rect.width - player.r);
+      player.y = Math.min(player.y, rect.height - player.r);
+      seedStars(rect.width, rect.height);
+      draw();
+    }
+
+    function seedStars(w, h) {
+      if (stars.length) return;
+      for (let i = 0; i < 80; i += 1) {
+        stars.push({ x: Math.random() * w, y: Math.random() * h, s: Math.random() * 1.8 + 0.4, v: Math.random() * 28 + 12 });
+      }
+    }
+
+    function resetGame() {
+      bullets.length = 0;
+      enemies.length = 0;
+      powerUps.length = 0;
+      sparks.length = 0;
+      rings.length = 0;
+      floatTexts.length = 0;
+      Object.assign(game, {
+        score: 0,
+        life: 3,
+        wave: 1,
+        spawnTimer: 0,
+        shootTimer: 0,
+        power: "",
+        powerTimer: 0,
+        shield: false,
+        combo: 0,
+        comboTimer: 0,
+        comboScale: 0,
+        invincible: 0,
+        hitFlash: 0,
+        shake: 0,
+        waveFlash: 0,
+        paused: false
+      });
+      player.x = width() / 2;
+      player.y = height() - 74;
+      updateHud();
+    }
+
+    function startGame() {
+      resetGame();
+      game.running = true;
+      game.lastTime = performance.now();
+      overlay.classList.remove("is-visible");
+      requestAnimationFrame(loop);
+    }
+
+    function updateHud() {
+      scoreEl.textContent = game.score;
+      lifeEl.textContent = game.life;
+      waveEl.textContent = game.wave;
+      const powerName = game.power === "rapid" ? t("rapid") : t("spread");
+      powerEl.textContent = game.shield ? t("shield") : game.power ? `${powerName} ${Math.ceil(game.powerTimer)}` : "-";
+      comboEl.textContent = `x${comboMultiplier()}`;
+      comboEl.style.transform = game.comboScale > 0 ? `scale(${1 + game.comboScale * 0.18})` : "scale(1)";
+      bestEl.textContent = game.best;
+    }
+
+    function showOverlay(title, message, buttonText) {
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      startButton.textContent = buttonText;
+      overlay.classList.add("is-visible");
+    }
+
+    function endGame() {
+      game.running = false;
+      game.best = Math.max(game.best, game.score);
+      saveBestScore(game.best);
+      updateHud();
+      showOverlay(t("gameOver"), t("gameOverMessage", game.score), t("restart"));
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = language;
+      document.querySelector("[aria-label='Neon Shooter']")?.setAttribute("aria-label", t("title"));
+      document.querySelector(".hud")?.setAttribute("aria-label", t("hudLabel"));
+      document.querySelector(".controls")?.setAttribute("aria-label", t("controlsLabel"));
+      canvas.setAttribute("aria-label", t("arenaLabel"));
+      pauseButton.setAttribute("title", game.paused ? t("resumeLabel") : t("pauseLabel"));
+      pauseButton.setAttribute("aria-label", game.paused ? t("resumeLabel") : t("pauseLabel"));
+      langButton.textContent = t("langButton");
+      document.querySelectorAll("[data-i18n]").forEach((node) => {
+        node.textContent = t(node.dataset.i18n);
+      });
+      if (!game.running) {
+        titleEl.textContent = titleEl.textContent === i18n.ja.gameOver || titleEl.textContent === i18n.en.gameOver ? t("gameOver") : t("title");
+        messageEl.textContent = titleEl.textContent === t("gameOver") ? t("gameOverMessage", game.score) : t("intro");
+        startButton.textContent = titleEl.textContent === t("gameOver") ? t("restart") : t("start");
+      }
+      updateHud();
+    }
+
+    function comboMultiplier() {
+      if (game.combo >= 30) return 4;
+      if (game.combo >= 15) return 3;
+      if (game.combo >= 6) return 2;
+      return 1;
+    }
+
+    function addCombo(x, y) {
+      game.combo += 1;
+      game.comboTimer = 3.2;
+      game.comboScale = 1;
+      const multiplier = comboMultiplier();
+      if (game.combo === 6 || game.combo === 15 || game.combo === 30) {
+        floatText(x, y - 24, t("comboText", game.combo), "#9dff6d");
+      }
+      return multiplier;
+    }
+
+    function resetCombo() {
+      game.combo = 0;
+      game.comboTimer = 0;
+      game.comboScale = 0;
+    }
+
+    function shoot() {
+      if (!game.running || game.paused || game.shootTimer > 0) return;
+      const angles = game.power === "spread" ? [-0.28, 0, 0.28] : [0];
+      for (const angle of angles) {
+        bullets.push({ x: player.x, y: player.y - player.r, r: 5, vx: Math.sin(angle) * 620, vy: -Math.cos(angle) * 620, life: 1.25 });
+      }
+      game.shootTimer = game.power === "rapid" ? 0.08 : 0.16;
+      burst(player.x, player.y - 22, 5, "rgba(54,216,255,");
+    }
+
+    function spawnEnemy() {
+      const w = width();
+      const tough = game.wave > 3 && Math.random() < 0.16;
+      const special = !tough && game.wave > 2 && Math.random() < 0.22;
+      const size = tough ? 28 : special ? 12 : Math.random() * 14 + 16;
+      enemies.push({
+        x: Math.random() * (w - size * 2) + size,
+        y: -size,
+        r: size,
+        vy: tough ? 58 + game.wave * 11 : special ? 150 + game.wave * 15 : 72 + game.wave * 18 + Math.random() * 48,
+        wobble: Math.random() * Math.PI * 2,
+        color: tough ? "#36d8ff" : special ? "#9dff6d" : Math.random() > 0.22 ? "#ff4f7b" : "#ffc857",
+        hp: tough ? 3 : 1,
+        maxHp: tough ? 3 : 1,
+        value: tough ? 65 : special ? 30 : 20
+      });
+    }
+
+    function burst(x, y, count, color) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 150 + 50;
+        sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: Math.random() * 0.35 + 0.2, max: 0.55, color });
+      }
+    }
+
+    function dropPowerUp(x, y) {
+      if (Math.random() > 0.18) return;
+      const pool = game.life < 3 ? ["heal", "rapid", "spread", "shield"] : ["rapid", "spread", "shield"];
+      powerUps.push({ x, y, r: 13, vy: 92, type: pool[Math.floor(Math.random() * pool.length)], spin: 0 });
+    }
+
+    function collectPowerUp(type) {
+      if (type === "heal") {
+        game.life = Math.min(5, game.life + 1);
+      } else if (type === "shield") {
+        game.shield = true;
+      } else {
+        game.power = type;
+        game.powerTimer = type === "spread" ? 8 : 7;
+      }
+      floatText(player.x, player.y - 34, type === "heal" ? t("heal") : type === "shield" ? t("shield") : type === "rapid" ? t("rapid") : t("spread"), type === "spread" ? "#9dff6d" : type === "heal" ? "#ffc857" : "#36d8ff");
+      burst(player.x, player.y, 18, type === "spread" ? "rgba(157,255,109," : "rgba(54,216,255,");
+    }
+
+    function floatText(x, y, text, color) {
+      floatTexts.push({ x, y, text, color, life: 0.85, max: 0.85 });
+    }
+
+    function hurtPlayer(x = player.x, y = player.y) {
+      if (game.invincible > 0) return false;
+      if (game.shield) {
+        game.shield = false;
+        game.invincible = 0.65;
+        game.hitFlash = 0.18;
+        game.shake = 0.12;
+        floatText(player.x, player.y - 34, t("blocked"), "#36d8ff");
+        burst(x, y, 16, "rgba(54,216,255,");
+        return false;
+      }
+      game.life -= 1;
+      game.power = "";
+      game.powerTimer = 0;
+      resetCombo();
+      game.invincible = 0.9;
+      game.hitFlash = 0.24;
+      game.shake = 0.16;
+      burst(x, y, 18, "rgba(255,79,123,");
+      if (game.life <= 0) {
+        endGame();
+        return true;
+      }
+      return false;
+    }
+
+    function hit(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const rr = a.r + b.r;
+      return dx * dx + dy * dy < rr * rr;
+    }
+
+    function update(dt) {
+      const w = width();
+      const h = height();
+      const left = keys.has("arrowleft") || keys.has("a");
+      const right = keys.has("arrowright") || keys.has("d");
+      const up = keys.has("arrowup") || keys.has("w");
+      const down = keys.has("arrowdown") || keys.has("s");
+      const dx = Number(right) - Number(left);
+      const dy = Number(down) - Number(up);
+      const length = Math.hypot(dx, dy) || 1;
+
+      player.x += (dx / length) * player.speed * dt;
+      player.y += (dy / length) * player.speed * dt;
+      if (pointer.active) {
+        player.x += (pointer.x - player.x) * Math.min(1, dt * 9);
+        player.y += (pointer.y - player.y) * Math.min(1, dt * 9);
+      }
+      player.x = Math.max(player.r, Math.min(w - player.r, player.x));
+      player.y = Math.max(player.r, Math.min(h - player.r, player.y));
+
+      game.shootTimer = Math.max(0, game.shootTimer - dt);
+      game.waveFlash = Math.max(0, game.waveFlash - dt);
+      game.hitFlash = Math.max(0, game.hitFlash - dt);
+      game.shake = Math.max(0, game.shake - dt);
+      game.invincible = Math.max(0, game.invincible - dt);
+      game.comboScale = Math.max(0, game.comboScale - dt * 4);
+      if (game.comboTimer > 0) {
+        game.comboTimer = Math.max(0, game.comboTimer - dt);
+        if (game.comboTimer === 0) resetCombo();
+      }
+      if (game.powerTimer > 0) {
+        game.powerTimer = Math.max(0, game.powerTimer - dt);
+        if (game.powerTimer === 0) game.power = "";
+      }
+      if (keys.has(" ") || pointer.active) shoot();
+
+      const nextWave = Math.floor(game.score / 180) + 1;
+      if (nextWave > game.wave) {
+        game.waveFlash = 0.75;
+        floatText(w / 2, 86, t("waveText", nextWave), "#36d8ff");
+      }
+      game.wave = nextWave;
+      game.spawnTimer -= dt;
+      if (game.spawnTimer <= 0 && enemies.length < Math.min(12, 5 + game.wave)) {
+        spawnEnemy();
+        game.spawnTimer = Math.max(0.34, 0.92 - Math.min(game.wave, 8) * 0.055);
+      }
+
+      for (const star of stars) {
+        star.y += star.v * dt;
+        if (star.y > h) { star.y = -4; star.x = Math.random() * w; }
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i -= 1) {
+        const b = bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life -= dt;
+        if (b.y < -20 || b.x < -20 || b.x > w + 20 || b.life <= 0) bullets.splice(i, 1);
+      }
+
+      for (let i = powerUps.length - 1; i >= 0; i -= 1) {
+        const p = powerUps[i];
+        const distance = Math.hypot(player.x - p.x, player.y - p.y);
+        if (distance < game.magnetRange) {
+          const pull = (1 - distance / game.magnetRange) * 420 * dt;
+          p.x += ((player.x - p.x) / Math.max(1, distance)) * pull;
+          p.y += ((player.y - p.y) / Math.max(1, distance)) * pull;
+        }
+        p.y += p.vy * dt;
+        p.spin += dt * 5;
+        if (hit(p, player)) {
+          powerUps.splice(i, 1);
+          collectPowerUp(p.type);
+        } else if (p.y - p.r > h) {
+          powerUps.splice(i, 1);
+        }
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i -= 1) {
+        const e = enemies[i];
+        e.wobble += dt * 3;
+        e.y += e.vy * dt;
+        e.x += Math.sin(e.wobble) * 42 * dt;
+        if (hit(e, player)) {
+          enemies.splice(i, 1);
+          if (hurtPlayer(player.x, player.y)) return;
+        } else if (e.y - e.r > h) {
+          enemies.splice(i, 1);
+          game.life -= 1;
+          resetCombo();
+          game.hitFlash = 0.18;
+          game.shake = 0.09;
+          if (game.life <= 0) return endGame();
+        }
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i -= 1) {
+        for (let j = bullets.length - 1; j >= 0; j -= 1) {
+          if (hit(enemies[i], bullets[j])) {
+            const e = enemies[i];
+            bullets.splice(j, 1);
+            e.hp -= 1;
+            const color = e.color === "#ffc857" ? "rgba(255,200,87," : e.color === "#9dff6d" ? "rgba(157,255,109," : e.color === "#36d8ff" ? "rgba(54,216,255," : "rgba(255,79,123,";
+            burst(e.x, e.y, e.hp <= 0 ? 20 : 8, color);
+            if (e.hp <= 0) {
+              rings.push({ x: e.x, y: e.y, r: e.maxHp > 1 ? 14 : 8, life: 0.34, max: 0.34, color: e.color });
+              dropPowerUp(e.x, e.y);
+              const multiplier = addCombo(e.x, e.y);
+              enemies.splice(i, 1);
+              game.score += (e.value + (e.color === "#ffc857" ? 15 : 0)) * multiplier;
+            } else {
+              rings.push({ x: e.x, y: e.y, r: 6, life: 0.18, max: 0.18, color: e.color });
+            }
+            break;
+          }
+        }
+      }
+
+      for (let i = sparks.length - 1; i >= 0; i -= 1) {
+        const p = sparks[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 120 * dt;
+        p.life -= dt;
+        if (p.life <= 0) sparks.splice(i, 1);
+      }
+
+      for (let i = rings.length - 1; i >= 0; i -= 1) {
+        rings[i].r += 180 * dt;
+        rings[i].life -= dt;
+        if (rings[i].life <= 0) rings.splice(i, 1);
+      }
+
+      for (let i = floatTexts.length - 1; i >= 0; i -= 1) {
+        const text = floatTexts[i];
+        text.y -= 34 * dt;
+        text.life -= dt;
+        if (text.life <= 0) floatTexts.splice(i, 1);
+      }
+
+      updateHud();
+    }
+
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      if (game.invincible > 0 && Math.floor(game.invincible * 16) % 2 === 0) {
+        ctx.globalAlpha = 0.45;
+      }
+      if (game.shield) {
+        ctx.strokeStyle = "rgba(54,216,255,0.8)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.r + 13 + Math.sin(performance.now() * 0.008) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.shadowColor = "#36d8ff";
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = "#36d8ff";
+      ctx.beginPath();
+      ctx.moveTo(0, -22);
+      ctx.lineTo(17, 18);
+      ctx.lineTo(0, 10);
+      ctx.lineTo(-17, 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#f4f7fb";
+      ctx.fillRect(-3, -7, 6, 14);
+      ctx.restore();
+    }
+
+    function draw() {
+      const w = width();
+      const h = height();
+      const shakeX = game.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
+      const shakeY = game.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+      if (game.waveFlash > 0) {
+        ctx.fillStyle = `rgba(54,216,255,${game.waveFlash * 0.12})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      ctx.fillStyle = "rgba(244,247,251,0.72)";
+      for (const star of stars) {
+        ctx.globalAlpha = Math.min(1, star.s / 2);
+        ctx.fillRect(star.x, star.y, star.s, star.s);
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.strokeStyle = "rgba(54,216,255,0.16)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h - 42);
+      ctx.lineTo(w, h - 42);
+      ctx.stroke();
+
+      for (const b of bullets) {
+        ctx.strokeStyle = "rgba(157,255,109,0.34)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y + 18);
+        ctx.lineTo(b.x - b.vx * 0.035, b.y - b.vy * 0.035);
+        ctx.stroke();
+        ctx.shadowColor = "#9dff6d";
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = "#9dff6d";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+
+      for (const p of powerUps) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.spin);
+        ctx.shadowColor = p.type === "spread" ? "#9dff6d" : p.type === "heal" ? "#ffc857" : "#36d8ff";
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = ctx.shadowColor;
+        ctx.beginPath();
+        ctx.moveTo(0, -p.r);
+        ctx.lineTo(p.r, 0);
+        ctx.lineTo(0, p.r);
+        ctx.lineTo(-p.r, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#061016";
+        ctx.font = "800 12px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(p.type === "heal" ? "+" : p.type === "rapid" ? "R" : p.type === "shield" ? "B" : "S", 0, 1);
+        ctx.restore();
+      }
+      ctx.shadowBlur = 0;
+
+      for (const e of enemies) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.wobble * 0.45);
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = e.color;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = (Math.PI * 2 * i) / 6;
+          const radius = i % 2 ? e.r * 0.58 : e.r;
+          ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+        }
+        ctx.closePath();
+        ctx.fill();
+        if (e.maxHp > 1) {
+          ctx.rotate(-e.wobble * 0.45);
+          ctx.fillStyle = "rgba(244,247,251,0.82)";
+          ctx.fillRect(-e.r, e.r + 7, e.r * 2, 4);
+          ctx.fillStyle = "#36d8ff";
+          ctx.fillRect(-e.r, e.r + 7, e.r * 2 * (e.hp / e.maxHp), 4);
+        }
+        ctx.restore();
+      }
+      ctx.shadowBlur = 0;
+
+      for (const ring of rings) {
+        const alpha = Math.max(0, ring.life / ring.max);
+        ctx.strokeStyle = ring.color === "#ffc857" ? `rgba(255,200,87,${alpha})` : ring.color === "#9dff6d" ? `rgba(157,255,109,${alpha})` : `rgba(255,79,123,${alpha})`;
+        ctx.lineWidth = 3 * alpha;
+        ctx.beginPath();
+        ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      drawPlayer();
+
+      for (const p of sparks) {
+        const alpha = Math.max(0, p.life / p.max);
+        ctx.fillStyle = `${p.color}${alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.2 * alpha, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const text of floatTexts) {
+        const alpha = Math.max(0, text.life / text.max);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = text.color;
+        ctx.font = "800 18px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text.text, text.x, text.y);
+        ctx.globalAlpha = 1;
+      }
+
+      if (game.paused) {
+        ctx.fillStyle = "rgba(5,7,11,0.52)";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#f4f7fb";
+        ctx.font = "800 42px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(t("paused"), w / 2, h / 2);
+      }
+      ctx.restore();
+
+      if (game.hitFlash > 0) {
+        ctx.strokeStyle = `rgba(255,79,123,${Math.min(0.72, game.hitFlash * 3)})`;
+        ctx.lineWidth = 10;
+        ctx.strokeRect(5, 5, w - 10, h - 10);
+      }
+    }
+
+    function loop(now) {
+      if (!game.running) return;
+      const dt = Math.min(0.033, (now - game.lastTime) / 1000);
+      game.lastTime = now;
+      if (!game.paused) update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("resize", fitCanvas);
+    window.addEventListener("orientationchange", () => {
+      window.setTimeout(fitCanvas, 180);
+    });
+    window.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+      if ([" ", "arrowleft", "arrowright", "arrowup", "arrowdown"].includes(key)) event.preventDefault();
+      if (key === "p" && game.running) {
+        game.paused = !game.paused;
+      } else if (key === "enter" && !game.running) {
+        startGame();
+      } else {
+        keys.add(key);
+      }
+    });
+    window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+
+    canvas.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      pointer.active = true;
+      pointer.offsetY = event.pointerType === "touch" ? Math.min(92, height() * 0.14) : 0;
+      pointer.x = event.clientX - rect.left;
+      pointer.y = event.clientY - rect.top - pointer.offsetY;
+      shoot();
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      event.preventDefault();
+      if (!pointer.active) return;
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = event.clientX - rect.left;
+      pointer.y = event.clientY - rect.top - pointer.offsetY;
+    });
+    canvas.addEventListener("pointerup", (event) => {
+      event.preventDefault();
+      pointer.active = false;
+    });
+    canvas.addEventListener("pointercancel", () => { pointer.active = false; });
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    document.addEventListener("touchmove", (event) => {
+      if (event.target === canvas) event.preventDefault();
+    }, { passive: false });
+
+    startButton.addEventListener("click", startGame);
+    pauseButton.addEventListener("click", () => {
+      if (!game.running) return;
+      game.paused = !game.paused;
+      pauseButton.setAttribute("title", game.paused ? t("resumeLabel") : t("pauseLabel"));
+      pauseButton.setAttribute("aria-label", game.paused ? t("resumeLabel") : t("pauseLabel"));
+      draw();
+    });
+    langButton.addEventListener("click", () => {
+      language = language === "ja" ? "en" : "ja";
+      saveLanguage(language);
+      applyLanguage();
+      draw();
+    });
+    applyLanguage();
+    fitCanvas();
+  </script>
+</body>
+</html>
