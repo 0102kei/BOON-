@@ -594,12 +594,12 @@
         upgradeMagnetDesc: "回収範囲が広がる",
         upgradeShield: "盾の恵み",
         upgradeShieldDesc: "シールド入手率アップ",
-        upgradeCharge: "チャージ強化",
-        upgradeChargeDesc: "チャージ弾が育ちやすい",
+        upgradeCharge: "連射安定",
+        upgradeChargeDesc: "通常ショットのテンポを保つ",
         bossIncoming: "ボス接近",
         bossName: "ボス",
         dodge: "回避",
-        charge: "チャージ",
+        charge: "",
         timeUp: "時間切れ"
       },
       en: {
@@ -656,12 +656,12 @@
         upgradeMagnetDesc: "Pull pickups from farther away",
         upgradeShield: "Shield Luck",
         upgradeShieldDesc: "More shield drops",
-        upgradeCharge: "Charge Boost",
-        upgradeChargeDesc: "Charge shots build faster",
+        upgradeCharge: "Flow Boost",
+        upgradeChargeDesc: "Keep rapid shots flowing",
         bossIncoming: "Boss Incoming",
         bossName: "BOSS",
         dodge: "Dodge",
-        charge: "CHARGE",
+        charge: "",
         timeUp: "Time Up"
       }
     };
@@ -711,11 +711,8 @@
       missionTimer: 0,
       upgradePending: false,
       nextUpgradeWave: 3,
-      charge: 0,
-      charging: false,
-      chargeCooldown: 0,
       dodges: 0,
-      upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0, charge: 0 },
+      upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0 },
       upgradeChoices: [],
       power: "",
       powerTimer: 0,
@@ -777,11 +774,8 @@
         missionTimer: 0,
         upgradePending: false,
         nextUpgradeWave: 3,
-        charge: 0,
-        charging: false,
-        chargeCooldown: 0,
         dodges: 0,
-        upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0, charge: 0 },
+        upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0 },
         upgradeChoices: [],
         power: "",
         powerTimer: 0,
@@ -926,25 +920,6 @@
       burst(player.x, player.y - 22, 5, "rgba(54,216,255,");
     }
 
-    function shootCharged(power) {
-      if (!game.running || game.paused || modeConfig[game.modeStarted].dodgeOnly || power < 0.22 || game.chargeCooldown > 0) return;
-      const full = power >= 0.92;
-      const speed = 560 + game.upgrades.bullet * 38;
-      bullets.push({
-        x: player.x,
-        y: player.y - player.r - 4,
-        r: full ? 12 : 8,
-        vx: 0,
-        vy: -speed,
-        life: 1.5,
-        damage: full ? 5 + game.upgrades.bullet : 2 + Math.floor(game.upgrades.bullet / 2),
-        pierce: full ? 3 : 1,
-        charge: power
-      });
-      game.chargeCooldown = full ? 0.42 : 0.24;
-      burst(player.x, player.y - 26, full ? 18 : 10, "rgba(255,200,87,");
-    }
-
     function spawnEnemy() {
       const w = width();
       const tough = game.wave > 3 && Math.random() < 0.16;
@@ -1068,8 +1043,7 @@
         ["fireRate", "upgradeFireRate", "upgradeFireRateDesc", "+12%"],
         ["bullet", "upgradeBullet", "upgradeBulletDesc", "+1"],
         ["magnet", "upgradeMagnet", "upgradeMagnetDesc", "+32"],
-        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"],
-        ["charge", "upgradeCharge", "upgradeChargeDesc", "+20%"]
+        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"]
       ].sort(() => Math.random() - 0.5).slice(0, 3);
       renderUpgradeChoices();
       upgradePanel.classList.add("is-visible");
@@ -1082,8 +1056,7 @@
         ["fireRate", "upgradeFireRate", "upgradeFireRateDesc", "+12%"],
         ["bullet", "upgradeBullet", "upgradeBulletDesc", "+1"],
         ["magnet", "upgradeMagnet", "upgradeMagnetDesc", "+32"],
-        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"],
-        ["charge", "upgradeCharge", "upgradeChargeDesc", "+20%"]
+        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"]
       ].slice(0, 3);
       for (const [type, nameKey, descKey, tag] of pool) {
         const button = document.createElement("button");
@@ -1172,10 +1145,6 @@
       player.y = Math.max(player.r, Math.min(h - player.r, player.y));
 
       game.shootTimer = Math.max(0, game.shootTimer - dt);
-      game.chargeCooldown = Math.max(0, game.chargeCooldown - dt);
-      if (game.charging && !modeConfig[game.modeStarted].dodgeOnly) {
-        game.charge = Math.min(1, game.charge + dt / Math.max(0.35, 0.8 - game.upgrades.charge * 0.08));
-      }
       game.waveFlash = Math.max(0, game.waveFlash - dt);
       game.hitFlash = Math.max(0, game.hitFlash - dt);
       game.shake = Math.max(0, game.shake - dt);
@@ -1189,7 +1158,7 @@
         game.powerTimer = Math.max(0, game.powerTimer - dt);
         if (game.powerTimer === 0) game.power = "";
       }
-      if ((keys.has(" ") || pointer.shooting) && !game.charging) shoot();
+      if (keys.has(" ") || pointer.shooting) shoot();
 
       const nextWave = Math.floor(game.score / 180) + 1;
       if (nextWave > game.wave) {
@@ -1348,13 +1317,6 @@
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(0, 0, player.r + 13 + Math.sin(performance.now() * 0.008) * 2, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      if (game.charge > 0) {
-        ctx.strokeStyle = `rgba(255,200,87,${0.35 + game.charge * 0.5})`;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(0, 0, player.r + 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * game.charge);
         ctx.stroke();
       }
       ctx.shadowColor = "#36d8ff";
@@ -1543,7 +1505,6 @@
       const key = event.key.toLowerCase();
       if ([" ", "arrowleft", "arrowright", "arrowup", "arrowdown"].includes(key)) event.preventDefault();
       if (key === " " && game.running && !game.paused) {
-        game.charging = true;
         keys.add(key);
       } else if (key === "p" && game.running) {
         game.paused = !game.paused;
@@ -1555,12 +1516,6 @@
     });
     window.addEventListener("keyup", (event) => {
       const key = event.key.toLowerCase();
-      if (key === " " && game.charging) {
-        if (game.charge < 0.22) shoot();
-        else shootCharged(game.charge);
-        game.charge = 0;
-        game.charging = false;
-      }
       keys.delete(key);
     });
 
@@ -1571,10 +1526,10 @@
       pointer.active = event.pointerType !== "touch" || !pointer.shooting;
       pointer.downAt = performance.now();
       pointer.moved = false;
-      game.charging = pointer.shooting;
       pointer.offsetY = event.pointerType === "touch" ? Math.min(92, height() * 0.14) : 0;
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top - pointer.offsetY;
+      if (pointer.shooting) shoot();
       canvas.setPointerCapture(event.pointerId);
     });
     canvas.addEventListener("pointermove", (event) => {
@@ -1587,20 +1542,12 @@
     });
     canvas.addEventListener("pointerup", (event) => {
       event.preventDefault();
-      if (game.charging) {
-        if (game.charge < 0.22 && !pointer.moved) shoot();
-        else shootCharged(game.charge);
-        game.charge = 0;
-        game.charging = false;
-      }
       pointer.active = false;
       pointer.shooting = false;
     });
     canvas.addEventListener("pointercancel", () => {
       pointer.active = false;
       pointer.shooting = false;
-      game.charging = false;
-      game.charge = 0;
     });
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     document.addEventListener("touchmove", (event) => {
