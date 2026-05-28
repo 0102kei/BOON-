@@ -164,6 +164,137 @@
       min-width: 132px;
     }
 
+    .mode-list {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 16px;
+      text-align: left;
+    }
+
+    .mode-button,
+    .upgrade-card {
+      width: 100%;
+      min-height: 0;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      padding: 10px 12px;
+      text-align: left;
+      box-shadow: none;
+    }
+
+    .mode-button strong,
+    .upgrade-card strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .mode-button span,
+    .upgrade-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .mode-button.is-selected {
+      border-color: rgba(54, 216, 255, 0.72);
+      background: rgba(54, 216, 255, 0.14);
+    }
+
+    .mission-bar,
+    .boss-bar {
+      position: absolute;
+      left: 64px;
+      right: 64px;
+      z-index: 2;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 11, 16, 0.58);
+      border-radius: 8px;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+
+    .mission-bar {
+      top: 12px;
+      min-height: 34px;
+      padding: 7px 10px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .mission-progress,
+    .boss-progress {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 3px;
+      width: 0%;
+      background: var(--lime);
+      transition: width 120ms linear;
+    }
+
+    .boss-bar {
+      top: 52px;
+      display: none;
+      min-height: 30px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .boss-bar.is-visible {
+      display: block;
+    }
+
+    .boss-progress {
+      background: var(--rose);
+    }
+
+    .upgrade-panel {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(5, 7, 11, 0.62);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+    }
+
+    .upgrade-panel.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .upgrade-box {
+      width: min(720px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(18, 23, 31, 0.95);
+      padding: 18px;
+      box-shadow: 0 22px 70px rgba(0, 0, 0, 0.46);
+    }
+
+    .upgrade-box h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .upgrade-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
     .pause-button {
       position: absolute;
       top: max(10px, env(safe-area-inset-top));
@@ -273,6 +404,25 @@
       .controls span:first-child {
         display: none;
       }
+
+      .mission-bar,
+      .boss-bar {
+        left: 8px;
+        right: 8px;
+        font-size: 11px;
+      }
+
+      .mission-bar {
+        top: 58px;
+      }
+
+      .boss-bar {
+        top: 96px;
+      }
+
+      .upgrade-list {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 480px) {
@@ -314,7 +464,22 @@
         <div class="dialog">
           <h1 id="title">Neon Shooter</h1>
           <p id="message">敵を撃ち落とし、落ちてくる強化アイテムで生き残れ。</p>
+          <div class="mode-list" id="modeList"></div>
           <button id="startButton" type="button">Start</button>
+        </div>
+      </div>
+      <div class="mission-bar" id="missionBar">
+        <span id="missionText">Mission</span>
+        <div class="mission-progress" id="missionProgress"></div>
+      </div>
+      <div class="boss-bar" id="bossBar">
+        <span id="bossText">Boss</span>
+        <div class="boss-progress" id="bossProgress"></div>
+      </div>
+      <div class="upgrade-panel" id="upgradePanel">
+        <div class="upgrade-box">
+          <h2 id="upgradeTitle">Upgrade</h2>
+          <div class="upgrade-list" id="upgradeList"></div>
         </div>
       </div>
     </section>
@@ -338,9 +503,19 @@
     const overlay = document.querySelector("#overlay");
     const titleEl = document.querySelector("#title");
     const messageEl = document.querySelector("#message");
+    const modeList = document.querySelector("#modeList");
     const startButton = document.querySelector("#startButton");
     const langButton = document.querySelector("#langButton");
     const pauseButton = document.querySelector("#pauseButton");
+    const missionBar = document.querySelector("#missionBar");
+    const missionText = document.querySelector("#missionText");
+    const missionProgress = document.querySelector("#missionProgress");
+    const bossBar = document.querySelector("#bossBar");
+    const bossText = document.querySelector("#bossText");
+    const bossProgress = document.querySelector("#bossProgress");
+    const upgradePanel = document.querySelector("#upgradePanel");
+    const upgradeTitle = document.querySelector("#upgradeTitle");
+    const upgradeList = document.querySelector("#upgradeList");
 
     const keys = new Set();
     const bullets = [];
@@ -350,9 +525,18 @@
     const rings = [];
     const floatTexts = [];
     const stars = [];
-    const pointer = { active: false, x: 0, y: 0, offsetY: 0 };
+    const pointer = { active: false, shooting: false, x: 0, y: 0, offsetY: 0, downAt: 0, moved: false };
     const bestKey = "neon-shooter-best";
     const langKey = "neon-shooter-lang";
+
+    const modes = ["classic", "time", "boss", "dodge", "mission"];
+    const modeConfig = {
+      classic: { bossEvery: 5, life: 3, timeLimit: 0, missionChance: 0.55, scoreRate: 1, dodgeOnly: false },
+      time: { bossEvery: 5, life: 3, timeLimit: 120, missionChance: 0.5, scoreRate: 1.2, dodgeOnly: false },
+      boss: { bossEvery: 2, life: 4, timeLimit: 0, missionChance: 0.35, scoreRate: 1, dodgeOnly: false },
+      dodge: { bossEvery: 0, life: 3, timeLimit: 90, missionChance: 0.75, scoreRate: 1.1, dodgeOnly: true },
+      mission: { bossEvery: 4, life: 3, timeLimit: 0, missionChance: 1, scoreRate: 1, dodgeOnly: false }
+    };
 
     const i18n = {
       ja: {
@@ -371,10 +555,10 @@
         intro: "敵を撃ち落とし、落ちてくる強化アイテムで生き残れ。",
         start: "開始",
         restart: "もう一度",
-        gameOver: "Game Over",
+        gameOver: "ゲームオーバー",
         gameOverMessage: (score) => `${score}点。もう一回いこう。`,
         paused: "一時停止",
-        waveText: (wave) => `Wave ${wave}`,
+        waveText: (wave) => `ウェーブ ${wave}`,
         rapid: "連射",
         spread: "拡散",
         shield: "シールド",
@@ -385,6 +569,38 @@
         arenaLabel: "射撃ゲーム画面",
         hudLabel: "ステータス",
         controlsLabel: "操作方法"
+        ,
+        modeClassic: "クラシック",
+        modeClassicDesc: "通常ルールで長く生き残る",
+        modeTime: "タイムアタック",
+        modeTimeDesc: "2分でハイスコアを狙う",
+        modeBoss: "ボスラッシュ",
+        modeBossDesc: "ボス多めの山場重視",
+        modeDodge: "回避モード",
+        modeDodgeDesc: "撃つより避けるほど伸びる",
+        modeMission: "ミッション",
+        modeMissionDesc: "小目標を達成して強化する",
+        missionKills: (a, b) => `ミッション: 敵を倒す ${a}/${b}`,
+        missionDodge: (a, b) => `ミッション: 回避 ${a}/${b}`,
+        missionCollect: (a, b) => `ミッション: 強化回収 ${a}/${b}`,
+        missionClear: "ミッション達成",
+        missionFailed: "ミッション終了",
+        upgradeTitle: "アップグレード",
+        upgradeFireRate: "連射強化",
+        upgradeFireRateDesc: "発射間隔を短縮",
+        upgradeBullet: "弾速強化",
+        upgradeBulletDesc: "弾が速く強くなる",
+        upgradeMagnet: "マグネット",
+        upgradeMagnetDesc: "回収範囲が広がる",
+        upgradeShield: "盾の恵み",
+        upgradeShieldDesc: "シールド入手率アップ",
+        upgradeCharge: "チャージ強化",
+        upgradeChargeDesc: "チャージ弾が育ちやすい",
+        bossIncoming: "ボス接近",
+        bossName: "ボス",
+        dodge: "回避",
+        charge: "チャージ",
+        timeUp: "時間切れ"
       },
       en: {
         score: "Score",
@@ -415,7 +631,38 @@
         langButton: "JP",
         arenaLabel: "Shooter game screen",
         hudLabel: "Stats",
-        controlsLabel: "Controls"
+        controlsLabel: "Controls",
+        modeClassic: "Classic",
+        modeClassicDesc: "Survive the standard waves",
+        modeTime: "Time Attack",
+        modeTimeDesc: "Score big in 2 minutes",
+        modeBoss: "Boss Rush",
+        modeBossDesc: "More bosses, bigger peaks",
+        modeDodge: "Dodge Mode",
+        modeDodgeDesc: "Score by weaving through danger",
+        modeMission: "Mission",
+        modeMissionDesc: "Clear objectives for rewards",
+        missionKills: (a, b) => `Mission: Defeat ${a}/${b}`,
+        missionDodge: (a, b) => `Mission: Dodge ${a}/${b}`,
+        missionCollect: (a, b) => `Mission: Collect ${a}/${b}`,
+        missionClear: "Mission Clear",
+        missionFailed: "Mission Ended",
+        upgradeTitle: "Upgrade",
+        upgradeFireRate: "Fire Rate",
+        upgradeFireRateDesc: "Shoot more often",
+        upgradeBullet: "Bullet Boost",
+        upgradeBulletDesc: "Faster, stronger shots",
+        upgradeMagnet: "Magnet",
+        upgradeMagnetDesc: "Pull pickups from farther away",
+        upgradeShield: "Shield Luck",
+        upgradeShieldDesc: "More shield drops",
+        upgradeCharge: "Charge Boost",
+        upgradeChargeDesc: "Charge shots build faster",
+        bossIncoming: "Boss Incoming",
+        bossName: "BOSS",
+        dodge: "Dodge",
+        charge: "CHARGE",
+        timeUp: "Time Up"
       }
     };
 
@@ -433,17 +680,17 @@
 
     let language = loadLanguage();
 
-    function t(key, value) {
+    function t(key, ...value) {
       const entry = i18n[language][key];
-      return typeof entry === "function" ? entry(value) : entry;
+      return typeof entry === "function" ? entry(...value) : entry;
     }
 
     function loadBestScore() {
-      try { return Number(localStorage.getItem(bestKey) || 0); } catch { return 0; }
+      try { return Number(localStorage.getItem(`${bestKey}-${game?.mode || "classic"}`) || 0); } catch { return 0; }
     }
 
     function saveBestScore(score) {
-      try { localStorage.setItem(bestKey, String(score)); } catch {}
+      try { localStorage.setItem(`${bestKey}-${game.modeStarted || game.mode}`, String(score)); } catch {}
     }
 
     const game = {
@@ -455,6 +702,21 @@
       wave: 1,
       spawnTimer: 0,
       shootTimer: 0,
+      mode: "classic",
+      modeStarted: "classic",
+      timeLeft: 0,
+      bossSpawnedWave: 0,
+      bossActive: false,
+      mission: null,
+      missionTimer: 0,
+      upgradePending: false,
+      nextUpgradeWave: 3,
+      charge: 0,
+      charging: false,
+      chargeCooldown: 0,
+      dodges: 0,
+      upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0, charge: 0 },
+      upgradeChoices: [],
       power: "",
       powerTimer: 0,
       shield: false,
@@ -466,7 +728,7 @@
       hitFlash: 0,
       shake: 0,
       waveFlash: 0,
-      best: loadBestScore()
+      best: 0
     };
 
     const player = { x: 480, y: 520, r: 17, speed: 340 };
@@ -503,10 +765,24 @@
       floatTexts.length = 0;
       Object.assign(game, {
         score: 0,
-        life: 3,
+        life: modeConfig[game.mode].life,
         wave: 1,
         spawnTimer: 0,
         shootTimer: 0,
+        modeStarted: game.mode,
+        timeLeft: modeConfig[game.mode].timeLimit,
+        bossSpawnedWave: 0,
+        bossActive: false,
+        mission: null,
+        missionTimer: 0,
+        upgradePending: false,
+        nextUpgradeWave: 3,
+        charge: 0,
+        charging: false,
+        chargeCooldown: 0,
+        dodges: 0,
+        upgrades: { fireRate: 0, bullet: 0, magnet: 0, shieldRate: 0, charge: 0 },
+        upgradeChoices: [],
         power: "",
         powerTimer: 0,
         shield: false,
@@ -519,8 +795,10 @@
         waveFlash: 0,
         paused: false
       });
+      game.best = loadBestScore();
       player.x = width() / 2;
       player.y = height() - 74;
+      startMission(true);
       updateHud();
     }
 
@@ -532,8 +810,31 @@
       requestAnimationFrame(loop);
     }
 
+    function renderModes() {
+      modeList.innerHTML = "";
+      const labels = {
+        classic: ["modeClassic", "modeClassicDesc"],
+        time: ["modeTime", "modeTimeDesc"],
+        boss: ["modeBoss", "modeBossDesc"],
+        dodge: ["modeDodge", "modeDodgeDesc"],
+        mission: ["modeMission", "modeMissionDesc"]
+      };
+      for (const mode of modes) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `mode-button${game.mode === mode ? " is-selected" : ""}`;
+        button.dataset.mode = mode;
+        button.innerHTML = `<strong>${t(labels[mode][0])}</strong><span>${t(labels[mode][1])}</span>`;
+        button.addEventListener("click", () => {
+          game.mode = mode;
+          renderModes();
+        });
+        modeList.appendChild(button);
+      }
+    }
+
     function updateHud() {
-      scoreEl.textContent = game.score;
+      scoreEl.textContent = game.timeLeft > 0 ? `${game.score} / ${Math.ceil(game.timeLeft)}` : game.score;
       lifeEl.textContent = game.life;
       waveEl.textContent = game.wave;
       const powerName = game.power === "rapid" ? t("rapid") : t("spread");
@@ -541,6 +842,14 @@
       comboEl.textContent = `x${comboMultiplier()}`;
       comboEl.style.transform = game.comboScale > 0 ? `scale(${1 + game.comboScale * 0.18})` : "scale(1)";
       bestEl.textContent = game.best;
+      const boss = enemies.find((enemy) => enemy.boss);
+      if (boss) {
+        bossText.textContent = `${t("bossName")} ${Math.max(0, boss.hp)}/${boss.maxHp}`;
+        bossProgress.style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
+        bossBar.classList.add("is-visible");
+      } else {
+        bossBar.classList.remove("is-visible");
+      }
     }
 
     function showOverlay(title, message, buttonText) {
@@ -575,6 +884,9 @@
         messageEl.textContent = titleEl.textContent === t("gameOver") ? t("gameOverMessage", game.score) : t("intro");
         startButton.textContent = titleEl.textContent === t("gameOver") ? t("restart") : t("start");
       }
+      renderModes();
+      updateMissionHud();
+      renderUpgradeChoices();
       updateHud();
     }
 
@@ -604,12 +916,33 @@
 
     function shoot() {
       if (!game.running || game.paused || game.shootTimer > 0) return;
+      if (modeConfig[game.modeStarted].dodgeOnly) return;
       const angles = game.power === "spread" ? [-0.28, 0, 0.28] : [0];
+      const speed = 620 + game.upgrades.bullet * 45;
       for (const angle of angles) {
-        bullets.push({ x: player.x, y: player.y - player.r, r: 5, vx: Math.sin(angle) * 620, vy: -Math.cos(angle) * 620, life: 1.25 });
+        bullets.push({ x: player.x, y: player.y - player.r, r: 5, vx: Math.sin(angle) * speed, vy: -Math.cos(angle) * speed, life: 1.25, damage: 1 + Math.floor(game.upgrades.bullet / 3), pierce: 0, charge: 0 });
       }
-      game.shootTimer = game.power === "rapid" ? 0.08 : 0.16;
+      game.shootTimer = Math.max(0.055, (game.power === "rapid" ? 0.08 : 0.16) - game.upgrades.fireRate * 0.012);
       burst(player.x, player.y - 22, 5, "rgba(54,216,255,");
+    }
+
+    function shootCharged(power) {
+      if (!game.running || game.paused || modeConfig[game.modeStarted].dodgeOnly || power < 0.22 || game.chargeCooldown > 0) return;
+      const full = power >= 0.92;
+      const speed = 560 + game.upgrades.bullet * 38;
+      bullets.push({
+        x: player.x,
+        y: player.y - player.r - 4,
+        r: full ? 12 : 8,
+        vx: 0,
+        vy: -speed,
+        life: 1.5,
+        damage: full ? 5 + game.upgrades.bullet : 2 + Math.floor(game.upgrades.bullet / 2),
+        pierce: full ? 3 : 1,
+        charge: power
+      });
+      game.chargeCooldown = full ? 0.42 : 0.24;
+      burst(player.x, player.y - 26, full ? 18 : 10, "rgba(255,200,87,");
     }
 
     function spawnEnemy() {
@@ -626,8 +959,32 @@
         color: tough ? "#36d8ff" : special ? "#9dff6d" : Math.random() > 0.22 ? "#ff4f7b" : "#ffc857",
         hp: tough ? 3 : 1,
         maxHp: tough ? 3 : 1,
-        value: tough ? 65 : special ? 30 : 20
+        value: tough ? 65 : special ? 30 : 20,
+        warn: tough || special ? 0.5 : 0,
+        dodged: false
       });
+    }
+
+    function spawnBoss() {
+      const w = width();
+      const r = Math.min(54, Math.max(38, w * 0.055));
+      enemies.push({
+        x: w / 2,
+        y: -r,
+        r,
+        vy: 42 + game.wave * 5,
+        wobble: 0,
+        color: "#b45cff",
+        hp: 18 + game.wave * 4,
+        maxHp: 18 + game.wave * 4,
+        value: 420 + game.wave * 40,
+        warn: 1.0,
+        dodged: false,
+        boss: true
+      });
+      game.bossActive = true;
+      game.bossSpawnedWave = game.wave;
+      floatText(w / 2, 92, t("bossIncoming"), "#ffc857");
     }
 
     function burst(x, y, count, color) {
@@ -639,7 +996,7 @@
     }
 
     function dropPowerUp(x, y) {
-      if (Math.random() > 0.18) return;
+      if (Math.random() > 0.18 + game.upgrades.shieldRate * 0.015) return;
       const pool = game.life < 3 ? ["heal", "rapid", "spread", "shield"] : ["rapid", "spread", "shield"];
       powerUps.push({ x, y, r: 13, vy: 92, type: pool[Math.floor(Math.random() * pool.length)], spin: 0 });
     }
@@ -659,6 +1016,95 @@
 
     function floatText(x, y, text, color) {
       floatTexts.push({ x, y, text, color, life: 0.85, max: 0.85 });
+    }
+
+    function startMission(force = false) {
+      const config = modeConfig[game.modeStarted || game.mode];
+      if (!force && Math.random() > config.missionChance) {
+        game.mission = null;
+        updateMissionHud();
+        return;
+      }
+      const types = config.dodgeOnly ? ["dodge"] : ["kills", "dodge", "collect"];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const target = type === "kills" ? 6 + Math.min(6, game.wave) : type === "dodge" ? 2 + Math.min(4, Math.floor(game.wave / 2)) : 2 + Math.min(3, Math.floor(game.wave / 3));
+      game.mission = { type, count: 0, target, rewarded: false };
+      game.missionTimer = 26;
+      updateMissionHud();
+    }
+
+    function addMissionProgress(type, amount = 1) {
+      if (!game.mission || game.mission.type !== type || game.mission.rewarded) return;
+      game.mission.count = Math.min(game.mission.target, game.mission.count + amount);
+      if (game.mission.count >= game.mission.target) {
+        game.mission.rewarded = true;
+        game.score += 160;
+        game.shield = true;
+        floatText(player.x, player.y - 44, t("missionClear"), "#9dff6d");
+        game.missionTimer = 2.2;
+      }
+      updateMissionHud();
+    }
+
+    function updateMissionHud() {
+      if (!game.mission) {
+        missionText.textContent = "";
+        missionProgress.style.width = "0%";
+        missionBar.style.display = "none";
+        return;
+      }
+      const key = game.mission.type === "kills" ? "missionKills" : game.mission.type === "dodge" ? "missionDodge" : "missionCollect";
+      missionText.textContent = t(key, game.mission.count, game.mission.target);
+      missionProgress.style.width = `${Math.round((game.mission.count / game.mission.target) * 100)}%`;
+      missionBar.style.display = "block";
+    }
+
+    function maybeShowUpgrade() {
+      if (game.wave < game.nextUpgradeWave || game.upgradePending || !game.running) return;
+      game.nextUpgradeWave += 3;
+      game.upgradePending = true;
+      game.paused = true;
+      game.upgradeChoices = [
+        ["fireRate", "upgradeFireRate", "upgradeFireRateDesc", "+12%"],
+        ["bullet", "upgradeBullet", "upgradeBulletDesc", "+1"],
+        ["magnet", "upgradeMagnet", "upgradeMagnetDesc", "+32"],
+        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"],
+        ["charge", "upgradeCharge", "upgradeChargeDesc", "+20%"]
+      ].sort(() => Math.random() - 0.5).slice(0, 3);
+      renderUpgradeChoices();
+      upgradePanel.classList.add("is-visible");
+    }
+
+    function renderUpgradeChoices() {
+      upgradeTitle.textContent = t("upgradeTitle");
+      upgradeList.innerHTML = "";
+      const pool = game.upgradeChoices.length ? game.upgradeChoices : [
+        ["fireRate", "upgradeFireRate", "upgradeFireRateDesc", "+12%"],
+        ["bullet", "upgradeBullet", "upgradeBulletDesc", "+1"],
+        ["magnet", "upgradeMagnet", "upgradeMagnetDesc", "+32"],
+        ["shieldRate", "upgradeShield", "upgradeShieldDesc", "+15%"],
+        ["charge", "upgradeCharge", "upgradeChargeDesc", "+20%"]
+      ].slice(0, 3);
+      for (const [type, nameKey, descKey, tag] of pool) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "upgrade-card";
+        button.innerHTML = `<strong>${t(nameKey)} <small>${tag}</small></strong><span>${t(descKey)}</span>`;
+        button.addEventListener("click", () => applyUpgrade(type));
+        upgradeList.appendChild(button);
+      }
+    }
+
+    function applyUpgrade(type) {
+      game.upgrades[type] += 1;
+      if (type === "magnet") game.magnetRange += 32;
+      game.upgradePending = false;
+      game.upgradeChoices = [];
+      game.paused = false;
+      upgradePanel.classList.remove("is-visible");
+      game.lastTime = performance.now();
+      floatText(player.x, player.y - 42, t("upgradeTitle"), "#ffc857");
+      updateHud();
     }
 
     function hurtPlayer(x = player.x, y = player.y) {
@@ -697,6 +1143,17 @@
     function update(dt) {
       const w = width();
       const h = height();
+      if (game.timeLeft > 0) {
+        game.timeLeft = Math.max(0, game.timeLeft - dt);
+        if (game.timeLeft === 0) {
+          game.running = false;
+          game.best = Math.max(game.best, game.score);
+          saveBestScore(game.best);
+          updateHud();
+          showOverlay(t("timeUp"), t("gameOverMessage", game.score), t("restart"));
+          return;
+        }
+      }
       const left = keys.has("arrowleft") || keys.has("a");
       const right = keys.has("arrowright") || keys.has("d");
       const up = keys.has("arrowup") || keys.has("w");
@@ -715,6 +1172,10 @@
       player.y = Math.max(player.r, Math.min(h - player.r, player.y));
 
       game.shootTimer = Math.max(0, game.shootTimer - dt);
+      game.chargeCooldown = Math.max(0, game.chargeCooldown - dt);
+      if (game.charging && !modeConfig[game.modeStarted].dodgeOnly) {
+        game.charge = Math.min(1, game.charge + dt / Math.max(0.35, 0.8 - game.upgrades.charge * 0.08));
+      }
       game.waveFlash = Math.max(0, game.waveFlash - dt);
       game.hitFlash = Math.max(0, game.hitFlash - dt);
       game.shake = Math.max(0, game.shake - dt);
@@ -728,18 +1189,32 @@
         game.powerTimer = Math.max(0, game.powerTimer - dt);
         if (game.powerTimer === 0) game.power = "";
       }
-      if (keys.has(" ") || pointer.active) shoot();
+      if ((keys.has(" ") || pointer.shooting) && !game.charging) shoot();
 
       const nextWave = Math.floor(game.score / 180) + 1;
       if (nextWave > game.wave) {
         game.waveFlash = 0.75;
         floatText(w / 2, 86, t("waveText", nextWave), "#36d8ff");
+        startMission();
       }
       game.wave = nextWave;
+      maybeShowUpgrade();
+      const bossEvery = modeConfig[game.modeStarted].bossEvery;
+      if (bossEvery && game.wave % bossEvery === 0 && game.bossSpawnedWave !== game.wave && !game.bossActive) {
+        spawnBoss();
+      }
       game.spawnTimer -= dt;
-      if (game.spawnTimer <= 0 && enemies.length < Math.min(12, 5 + game.wave)) {
+      if (game.spawnTimer <= 0 && enemies.length < Math.min(game.bossActive ? 8 : 12, 5 + game.wave)) {
         spawnEnemy();
         game.spawnTimer = Math.max(0.34, 0.92 - Math.min(game.wave, 8) * 0.055);
+      }
+      if (game.mission) {
+        game.missionTimer = Math.max(0, game.missionTimer - dt);
+        if (game.missionTimer === 0) {
+          if (!game.mission.rewarded) floatText(w / 2, 112, t("missionFailed"), "#aeb8c8");
+          game.mission = null;
+          updateMissionHud();
+        }
       }
 
       for (const star of stars) {
@@ -768,6 +1243,7 @@
         if (hit(p, player)) {
           powerUps.splice(i, 1);
           collectPowerUp(p.type);
+          addMissionProgress("collect");
         } else if (p.y - p.r > h) {
           powerUps.splice(i, 1);
         }
@@ -775,36 +1251,59 @@
 
       for (let i = enemies.length - 1; i >= 0; i -= 1) {
         const e = enemies[i];
+        if (e.warn > 0) {
+          e.warn = Math.max(0, e.warn - dt);
+          continue;
+        }
         e.wobble += dt * 3;
         e.y += e.vy * dt;
-        e.x += Math.sin(e.wobble) * 42 * dt;
+        e.x += Math.sin(e.wobble) * (e.boss ? 74 : 42) * dt;
+        const near = Math.hypot(e.x - player.x, e.y - player.y);
+        if (!e.dodged && near < player.r + e.r + 30 && !hit(e, player)) {
+          e.dodged = true;
+          game.dodges += 1;
+          game.score += 18 * comboMultiplier();
+          addMissionProgress("dodge");
+          rings.push({ x: player.x, y: player.y, r: 18, life: 0.26, max: 0.26, color: "#36d8ff" });
+          floatText(player.x + 22, player.y - 32, `${t("dodge")} +${18 * comboMultiplier()}`, "#ffc857");
+        }
         if (hit(e, player)) {
           enemies.splice(i, 1);
+          if (e.boss) game.bossActive = false;
           if (hurtPlayer(player.x, player.y)) return;
         } else if (e.y - e.r > h) {
           enemies.splice(i, 1);
-          game.life -= 1;
+          if (e.boss) game.bossActive = false;
           resetCombo();
-          game.hitFlash = 0.18;
-          game.shake = 0.09;
-          if (game.life <= 0) return endGame();
+          if (hurtPlayer(player.x, player.y)) return;
         }
       }
 
       for (let i = enemies.length - 1; i >= 0; i -= 1) {
+        if (enemies[i].warn > 0) continue;
         for (let j = bullets.length - 1; j >= 0; j -= 1) {
           if (hit(enemies[i], bullets[j])) {
             const e = enemies[i];
-            bullets.splice(j, 1);
-            e.hp -= 1;
+            const b = bullets[j];
+            e.hp -= b.damage || 1;
+            if (b.pierce > 0) {
+              b.pierce -= 1;
+            } else {
+              bullets.splice(j, 1);
+            }
             const color = e.color === "#ffc857" ? "rgba(255,200,87," : e.color === "#9dff6d" ? "rgba(157,255,109," : e.color === "#36d8ff" ? "rgba(54,216,255," : "rgba(255,79,123,";
             burst(e.x, e.y, e.hp <= 0 ? 20 : 8, color);
             if (e.hp <= 0) {
+              if (e.boss) {
+                game.bossActive = false;
+                game.nextUpgradeWave = Math.min(game.nextUpgradeWave, game.wave);
+              }
               rings.push({ x: e.x, y: e.y, r: e.maxHp > 1 ? 14 : 8, life: 0.34, max: 0.34, color: e.color });
               dropPowerUp(e.x, e.y);
               const multiplier = addCombo(e.x, e.y);
               enemies.splice(i, 1);
-              game.score += (e.value + (e.color === "#ffc857" ? 15 : 0)) * multiplier;
+              game.score += Math.round((e.value + (e.color === "#ffc857" ? 15 : 0)) * multiplier * modeConfig[game.modeStarted].scoreRate);
+              addMissionProgress("kills");
             } else {
               rings.push({ x: e.x, y: e.y, r: 6, life: 0.18, max: 0.18, color: e.color });
             }
@@ -851,6 +1350,13 @@
         ctx.arc(0, 0, player.r + 13 + Math.sin(performance.now() * 0.008) * 2, 0, Math.PI * 2);
         ctx.stroke();
       }
+      if (game.charge > 0) {
+        ctx.strokeStyle = `rgba(255,200,87,${0.35 + game.charge * 0.5})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.r + 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * game.charge);
+        ctx.stroke();
+      }
       ctx.shadowColor = "#36d8ff";
       ctx.shadowBlur = 20;
       ctx.fillStyle = "#36d8ff";
@@ -893,16 +1399,31 @@
       ctx.lineTo(w, h - 42);
       ctx.stroke();
 
+      for (const e of enemies) {
+        if (e.warn > 0) {
+          const alpha = Math.max(0.15, e.warn);
+          ctx.fillStyle = `rgba(255,200,87,${alpha * 0.22})`;
+          ctx.fillRect(Math.max(0, e.x - e.r * 1.4), 0, e.r * 2.8, h);
+          ctx.fillStyle = `rgba(255,200,87,${alpha})`;
+          ctx.beginPath();
+          ctx.moveTo(e.x, 28);
+          ctx.lineTo(e.x - 11, 8);
+          ctx.lineTo(e.x + 11, 8);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
       for (const b of bullets) {
-        ctx.strokeStyle = "rgba(157,255,109,0.34)";
+        ctx.strokeStyle = b.charge > 0 ? "rgba(255,200,87,0.42)" : "rgba(157,255,109,0.34)";
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(b.x, b.y + 18);
         ctx.lineTo(b.x - b.vx * 0.035, b.y - b.vy * 0.035);
         ctx.stroke();
-        ctx.shadowColor = "#9dff6d";
+        ctx.shadowColor = b.charge > 0 ? "#ffc857" : "#9dff6d";
         ctx.shadowBlur = 16;
-        ctx.fillStyle = "#9dff6d";
+        ctx.fillStyle = b.charge > 0 ? "#ffc857" : "#9dff6d";
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
         ctx.fill();
@@ -960,7 +1481,7 @@
 
       for (const ring of rings) {
         const alpha = Math.max(0, ring.life / ring.max);
-        ctx.strokeStyle = ring.color === "#ffc857" ? `rgba(255,200,87,${alpha})` : ring.color === "#9dff6d" ? `rgba(157,255,109,${alpha})` : `rgba(255,79,123,${alpha})`;
+        ctx.strokeStyle = ring.color === "#ffc857" ? `rgba(255,200,87,${alpha})` : ring.color === "#9dff6d" ? `rgba(157,255,109,${alpha})` : ring.color === "#36d8ff" ? `rgba(54,216,255,${alpha})` : ring.color === "#b45cff" ? `rgba(180,92,255,${alpha})` : `rgba(255,79,123,${alpha})`;
         ctx.lineWidth = 3 * alpha;
         ctx.beginPath();
         ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
@@ -1021,7 +1542,10 @@
     window.addEventListener("keydown", (event) => {
       const key = event.key.toLowerCase();
       if ([" ", "arrowleft", "arrowright", "arrowup", "arrowdown"].includes(key)) event.preventDefault();
-      if (key === "p" && game.running) {
+      if (key === " " && game.running && !game.paused) {
+        game.charging = true;
+        keys.add(key);
+      } else if (key === "p" && game.running) {
         game.paused = !game.paused;
       } else if (key === "enter" && !game.running) {
         startGame();
@@ -1029,30 +1553,55 @@
         keys.add(key);
       }
     });
-    window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+    window.addEventListener("keyup", (event) => {
+      const key = event.key.toLowerCase();
+      if (key === " " && game.charging) {
+        if (game.charge < 0.22) shoot();
+        else shootCharged(game.charge);
+        game.charge = 0;
+        game.charging = false;
+      }
+      keys.delete(key);
+    });
 
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       const rect = canvas.getBoundingClientRect();
-      pointer.active = true;
+      pointer.shooting = event.pointerType !== "touch" || event.clientX - rect.left > rect.width * 0.52;
+      pointer.active = event.pointerType !== "touch" || !pointer.shooting;
+      pointer.downAt = performance.now();
+      pointer.moved = false;
+      game.charging = pointer.shooting;
       pointer.offsetY = event.pointerType === "touch" ? Math.min(92, height() * 0.14) : 0;
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top - pointer.offsetY;
-      shoot();
       canvas.setPointerCapture(event.pointerId);
     });
     canvas.addEventListener("pointermove", (event) => {
       event.preventDefault();
-      if (!pointer.active) return;
       const rect = canvas.getBoundingClientRect();
+      if (Math.hypot(pointer.x - (event.clientX - rect.left), pointer.y - (event.clientY - rect.top - pointer.offsetY)) > 8) pointer.moved = true;
+      if (!pointer.active) return;
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top - pointer.offsetY;
     });
     canvas.addEventListener("pointerup", (event) => {
       event.preventDefault();
+      if (game.charging) {
+        if (game.charge < 0.22 && !pointer.moved) shoot();
+        else shootCharged(game.charge);
+        game.charge = 0;
+        game.charging = false;
+      }
       pointer.active = false;
+      pointer.shooting = false;
     });
-    canvas.addEventListener("pointercancel", () => { pointer.active = false; });
+    canvas.addEventListener("pointercancel", () => {
+      pointer.active = false;
+      pointer.shooting = false;
+      game.charging = false;
+      game.charge = 0;
+    });
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     document.addEventListener("touchmove", (event) => {
       if (event.target === canvas) event.preventDefault();
