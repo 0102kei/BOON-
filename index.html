@@ -910,7 +910,6 @@
 
     function shoot() {
       if (!game.running || game.paused || game.shootTimer > 0) return;
-      if (modeConfig[game.modeStarted].dodgeOnly) return;
       const angles = game.power === "spread" ? [-0.28, 0, 0.28] : [0];
       const speed = 620 + game.upgrades.bullet * 45;
       for (const angle of angles) {
@@ -1158,7 +1157,7 @@
         game.powerTimer = Math.max(0, game.powerTimer - dt);
         if (game.powerTimer === 0) game.power = "";
       }
-      if (keys.has(" ") || pointer.shooting) shoot();
+      if (keys.has(" ") || pointer.active || pointer.shooting) shoot();
 
       const nextWave = Math.floor(game.score / 180) + 1;
       if (nextWave > game.wave) {
@@ -1523,13 +1522,13 @@
       event.preventDefault();
       const rect = canvas.getBoundingClientRect();
       pointer.shooting = event.pointerType !== "touch" || event.clientX - rect.left > rect.width * 0.52;
-      pointer.active = event.pointerType !== "touch" || !pointer.shooting;
+      pointer.active = true;
       pointer.downAt = performance.now();
       pointer.moved = false;
       pointer.offsetY = event.pointerType === "touch" ? Math.min(92, height() * 0.14) : 0;
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top - pointer.offsetY;
-      if (pointer.shooting) shoot();
+      shoot();
       canvas.setPointerCapture(event.pointerId);
     });
     canvas.addEventListener("pointermove", (event) => {
